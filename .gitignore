@@ -169,4 +169,5 @@ dist
 .pnp.\*
 
 # OtterSong-specific
-.config.toml
+config.toml
+sqlite.db
