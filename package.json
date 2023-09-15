@@ -16,6 +16,8 @@
   "dependencies": {
     "discord.js": "^14.13.0",
     "drizzle-orm": "^0.28.6",
+    "google-auth-library": "^9.0.0",
+    "googleapis": "^126.0.1",
     "winston": "^3.10.0"
   }
 }

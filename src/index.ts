@@ -4,8 +4,13 @@ import CONFIG from '../config.toml';
 import commands from './commands';
 import logger from './logger';
 import { syncMigrations } from './database';
+import youtube from './youtube';
 
+// App initialization
 syncMigrations();
+if (!youtube.hasCredentials) {
+  await youtube.regenerateCredentials();
+}
 
 // Update application commands
 const rest = new REST({ version: '10' }).setToken(CONFIG.token);
@@ -30,7 +35,10 @@ client.on('interactionCreate', async (interaction) => {
   if (interaction.isChatInputCommand()) {
     const command = commands.get(interaction.commandName);
     if (command) {
-      logger.info(`COMMAND: ${interaction.commandName} USER: ${interaction.user.username}`);
+      const subcommand = interaction.options.getSubcommand();
+      logger.info(
+        `COMMAND: ${interaction.commandName}${subcommand ? ` ${subcommand}` : ''} USER: ${interaction.user.username}`
+      );
       await command.execute(interaction);
     }
   } else if (interaction.isAutocomplete()) {

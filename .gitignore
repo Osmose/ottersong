@@ -171,3 +171,4 @@ dist
 # OtterSong-specific
 config.toml
 sqlite.db
+youtube_token.json

@@ -3,6 +3,8 @@ import { AutocompleteInteraction, ChatInputCommandInteraction, SlashCommandBuild
 import db from '../database';
 import { playlists } from '../schema';
 import { eq, like } from 'drizzle-orm';
+import youtube from '../youtube';
+import logger from '../logger';
 
 export default {
   data: new SlashCommandBuilder()
@@ -22,7 +24,8 @@ export default {
         .addStringOption((option) =>
           option.setName('name').setDescription('Playlist name').setRequired(true).setAutocomplete(true)
         )
-    ),
+    )
+    .addSubcommand((subcommand) => subcommand.setName('sync').setDescription('Sync saved playlists with Youtube')),
   async execute(interaction: ChatInputCommandInteraction) {
     switch (interaction.options.getSubcommand()) {
       case 'create': {
@@ -36,7 +39,13 @@ export default {
           });
         }
 
-        await db.insert(playlists).values({ type: 'manual' as const, name });
+        const [playlist] = await db
+          .insert(playlists)
+          .values({ type: 'manual' as const, name })
+          .returning();
+        const youtubePlaylistId = await youtube.createPlaylist(name);
+        await db.update(playlists).set({ youtubePlaylistId }).where(eq(playlists.id, playlist.id));
+
         return interaction.reply({ content: `Created playlist "${name}".`, ephemeral: true });
       }
 
@@ -56,8 +65,24 @@ export default {
           });
         }
 
+        if (existingPlaylist.youtubePlaylistId) {
+          await youtube.deletePlaylist(existingPlaylist.youtubePlaylistId);
+        }
         await db.delete(playlists).where(eq(playlists.id, existingPlaylist.id));
+
         return interaction.reply({ content: `Deleted playlist "${name}"`, ephemeral: true });
+      }
+
+      case 'sync': {
+        const playlistsToSync = await db.query.playlists.findMany();
+        for (const playlist of playlistsToSync) {
+          if (!playlist.youtubePlaylistId) {
+            logger.info(`Creating Youtube playlist for "${playlist.name}" (ID: ${playlist.id})`);
+            const youtubePlaylistId = await youtube.createPlaylist(playlist.name);
+            await db.update(playlists).set({ youtubePlaylistId }).where(eq(playlists.id, playlist.id));
+          }
+        }
+        return interaction.reply({ content: 'Playlists synced successfully', ephemeral: true });
       }
     }
   },
