@@ -113,12 +113,24 @@ export default {
       }
 
       case 'sync': {
-        const playlistsToSync = await prisma.playlist.findMany();
+        const playlistsToSync = await prisma.playlist.findMany({ include: { songs: true } });
         for (const playlist of playlistsToSync) {
+          // Create playlist if missing
+          let youtubePlaylistId: string | null | undefined = playlist.youtubePlaylistId;
           if (!playlist.youtubePlaylistId) {
             logger.info(`Creating Youtube playlist for "${playlist.name}" (ID: ${playlist.id})`);
-            const youtubePlaylistId = await youtube.createPlaylist(playlist.name);
+            youtubePlaylistId = await youtube.createPlaylist(playlist.name);
             await prisma.playlist.update({ where: { id: playlist.id }, data: { youtubePlaylistId } });
+          }
+
+          // Create playlist items if missing
+          if (youtubePlaylistId) {
+            for (const song of playlist.songs) {
+              if (!song.youtubePlaylistItemId) {
+                const youtubePlaylistItemId = await youtube.createPlaylistItem(youtubePlaylistId, song.youtubeVideoId);
+                await prisma.song.update({ where: { id: song.id }, data: { youtubePlaylistItemId } });
+              }
+            }
           }
         }
         return interaction.reply({ content: 'Playlists synced successfully', ephemeral: true });
@@ -129,6 +141,8 @@ export default {
         const playlist = await getPlaylist(interaction, name);
         if (!playlist) {
           return;
+        } else if (playlist.youtubePlaylistId === null) {
+          return interaction.reply({ content: 'Cannot add song to unsynced playlist.', ephemeral: true });
         }
 
         const url = interaction.options.getString('url', true);
@@ -137,7 +151,9 @@ export default {
           return interaction.reply({ content: `No video found at the URL ${url}`, ephemeral: true });
         }
 
-        await prisma.song.create({ data: { playlistId: playlist.id, youtubeVideoId: videoId } });
+        const song = await prisma.song.create({ data: { playlistId: playlist.id, youtubeVideoId: videoId } });
+        const playlistItemId = await youtube.createPlaylistItem(playlist.youtubePlaylistId, videoId);
+        await prisma.song.update({ where: { id: song.id }, data: { youtubePlaylistItemId: playlistItemId } });
 
         return interaction.reply({ content: 'Song added successfully', ephemeral: true });
       }
@@ -161,6 +177,9 @@ export default {
           return interaction.reply({ content: 'Song is not in this playlist', ephemeral: true });
         }
 
+        if (song.youtubePlaylistItemId) {
+          await youtube.deletePlaylistItem(song.youtubePlaylistItemId);
+        }
         await prisma.song.delete({ where: { id: song.id } });
 
         return interaction.reply({ content: 'Song removed', ephemeral: true });

@@ -87,6 +87,19 @@ export class Youtube {
 
     return null;
   }
+
+  async createPlaylistItem(playlistId: string, videoId: string) {
+    const response = await this.service.playlistItems.insert({
+      auth: this.oauth,
+      part: ['snippet'],
+      requestBody: { snippet: { playlistId, resourceId: { kind: 'youtube#video', videoId } } },
+    });
+    return response.data.id;
+  }
+
+  async deletePlaylistItem(id: string) {
+    return this.service.playlistItems.delete({ auth: this.oauth, id });
+  }
 }
 
 export default new Youtube(CONFIG.youtubeClientId, CONFIG.youtubeClientSecret);

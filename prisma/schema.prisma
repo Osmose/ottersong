@@ -16,10 +16,11 @@ model Playlist {
 }
 
 model Song {
-  id             Int      @id @default(autoincrement())
-  playlist       Playlist @relation(fields: [playlistId], references: [id])
-  playlistId     Int
-  youtubeVideoId String
+  id                    Int      @id @default(autoincrement())
+  playlist              Playlist @relation(fields: [playlistId], references: [id])
+  playlistId            Int
+  youtubePlaylistItemId String?
+  youtubeVideoId        String
 
   @@unique([playlistId, youtubeVideoId])
 }
