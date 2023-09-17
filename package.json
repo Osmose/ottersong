@@ -4,18 +4,21 @@
   "type": "module",
   "scripts": {
     "start": "bun --watch src/index.ts",
-    "generate": "drizzle-kit generate:sqlite"
+    "generate": "prisma generate",
+    "migrate": "prisma migrate dev"
   },
   "devDependencies": {
     "bun-types": "latest",
-    "drizzle-kit": "^0.19.13"
+    "drizzle-kit": "^0.19.13",
+    "prisma": "^5.3.1"
   },
   "peerDependencies": {
     "typescript": "^5.0.0"
   },
   "dependencies": {
+    "@prisma/client": "5.3.1",
+    "dedent": "^1.5.1",
     "discord.js": "^14.13.0",
-    "drizzle-orm": "^0.28.6",
     "google-auth-library": "^9.0.0",
     "googleapis": "^126.0.1",
     "winston": "^3.10.0"

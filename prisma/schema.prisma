@@ -1,0 +1,25 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Playlist {
+  id                Int     @id @default(autoincrement())
+  type              String?
+  name              String  @unique
+  youtubePlaylistId String?
+  songs             Song[]
+}
+
+model Song {
+  id             Int      @id @default(autoincrement())
+  playlist       Playlist @relation(fields: [playlistId], references: [id])
+  playlistId     Int
+  youtubeVideoId String
+
+  @@unique([playlistId, youtubeVideoId])
+}

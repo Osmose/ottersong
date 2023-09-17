@@ -72,6 +72,21 @@ export class Youtube {
       id,
     });
   }
+
+  async getVideoId(url: string) {
+    const response = await this.service.search.list({
+      auth: this.oauth,
+      part: ['snippet'],
+      maxResults: 1,
+      q: url,
+      type: ['video'],
+    });
+    if (response.data.items && response.data.items.length > 0) {
+      return response.data.items[0].id?.videoId;
+    }
+
+    return null;
+  }
 }
 
 export default new Youtube(CONFIG.youtubeClientId, CONFIG.youtubeClientSecret);

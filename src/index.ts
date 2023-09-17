@@ -3,11 +3,9 @@ import { REST, Routes, Client, GatewayIntentBits } from 'discord.js';
 import CONFIG from '../config.toml';
 import commands from './commands';
 import logger from './logger';
-import { syncMigrations } from './database';
 import youtube from './youtube';
 
 // App initialization
-syncMigrations();
 if (!youtube.hasCredentials) {
   await youtube.regenerateCredentials();
 }
