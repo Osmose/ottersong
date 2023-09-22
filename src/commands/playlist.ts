@@ -9,12 +9,14 @@ import prisma from '../database';
 import youtube from '../youtube';
 import logger from '../logger';
 import dedent from 'dedent';
+import playlists from '../models/playlists';
+import songs from '../models/songs';
 
 const playlistNameOption = (option: SlashCommandStringOption) =>
   option.setName('name').setDescription('Playlist name').setRequired(true);
 
 async function getPlaylist(interaction: ChatInputCommandInteraction, name: string, errorMessage?: string) {
-  const playlist = await prisma.playlist.findUnique({ where: { name } });
+  const playlist = await playlists.fetchByName(name);
   if (!playlist) {
     await interaction.reply({
       content: errorMessage ?? `No playlist found with the name "${name}".`,
@@ -76,7 +78,7 @@ export default {
       case 'create': {
         const name = interaction.options.getString('name', true);
 
-        const existingPlaylist = await prisma.playlist.findUnique({ where: { name } });
+        const existingPlaylist = await playlists.fetchByName(name);
         if (existingPlaylist) {
           return interaction.reply({
             content: `Could not create playlist as one already exists with the name "${name}".`,
@@ -84,16 +86,14 @@ export default {
           });
         }
 
-        const playlist = await prisma.playlist.create({ data: { type: 'manual', name } });
-        const youtubePlaylistId = await youtube.createPlaylist(name);
-        await prisma.playlist.update({ where: { id: playlist.id }, data: { youtubePlaylistId } });
+        await playlists.create(name);
 
         return interaction.reply({ content: `Created playlist "${name}".`, ephemeral: true });
       }
 
       case 'list': {
-        const playlists = await prisma.playlist.findMany();
-        const formattedList = playlists.map((playlist) => `- ${playlist.name}`).join('\n');
+        const allPlaylists = await playlists.fetchAll();
+        const formattedList = allPlaylists.map((playlist) => `- ${playlist.name}`).join('\n');
         return interaction.reply({ content: `All playlists:\n${formattedList}` });
       }
 
@@ -104,10 +104,7 @@ export default {
           return;
         }
 
-        if (playlist.youtubePlaylistId) {
-          await youtube.deletePlaylist(playlist.youtubePlaylistId);
-        }
-        await prisma.playlist.delete({ where: { id: playlist.id } });
+        await playlists.delete(playlist);
 
         return interaction.reply({ content: `Deleted playlist "${name}"`, ephemeral: true });
       }
@@ -115,21 +112,12 @@ export default {
       case 'sync': {
         const playlistsToSync = await prisma.playlist.findMany({ include: { songs: true } });
         for (const playlist of playlistsToSync) {
-          // Create playlist if missing
-          let youtubePlaylistId: string | null | undefined = playlist.youtubePlaylistId;
-          if (!playlist.youtubePlaylistId) {
-            logger.info(`Creating Youtube playlist for "${playlist.name}" (ID: ${playlist.id})`);
-            youtubePlaylistId = await youtube.createPlaylist(playlist.name);
-            await prisma.playlist.update({ where: { id: playlist.id }, data: { youtubePlaylistId } });
-          }
+          await playlists.sync(playlist);
 
           // Create playlist items if missing
-          if (youtubePlaylistId) {
+          if (playlist.youtubePlaylistId) {
             for (const song of playlist.songs) {
-              if (!song.youtubePlaylistItemId) {
-                const youtubePlaylistItemId = await youtube.createPlaylistItem(youtubePlaylistId, song.youtubeVideoId);
-                await prisma.song.update({ where: { id: song.id }, data: { youtubePlaylistItemId } });
-              }
+              await songs.sync(song, playlist);
             }
           }
         }
@@ -151,9 +139,7 @@ export default {
           return interaction.reply({ content: `No video found at the URL ${url}`, ephemeral: true });
         }
 
-        const song = await prisma.song.create({ data: { playlistId: playlist.id, youtubeVideoId: videoId } });
-        const playlistItemId = await youtube.createPlaylistItem(playlist.youtubePlaylistId, videoId);
-        await prisma.song.update({ where: { id: song.id }, data: { youtubePlaylistItemId: playlistItemId } });
+        await songs.create(playlist, videoId);
 
         return interaction.reply({ content: 'Song added successfully', ephemeral: true });
       }
@@ -161,7 +147,6 @@ export default {
       case 'remove_song': {
         const name = interaction.options.getString('name', true);
         const playlist = await getPlaylist(interaction, name);
-        console.log(`playlist: ${JSON.stringify(playlist)}`);
         if (!playlist) {
           return;
         }
@@ -172,23 +157,19 @@ export default {
           return interaction.reply({ content: `No video found at the URL ${url}`, ephemeral: true });
         }
 
-        const song = await prisma.song.findFirst({ where: { playlistId: playlist.id, youtubeVideoId: videoId } });
+        const song = await songs.fetchByVideoId(playlist.id, videoId);
         if (!song) {
           return interaction.reply({ content: 'Song is not in this playlist', ephemeral: true });
         }
 
-        if (song.youtubePlaylistItemId) {
-          await youtube.deletePlaylistItem(song.youtubePlaylistItemId);
-        }
-        await prisma.song.delete({ where: { id: song.id } });
+        await songs.delete(song);
 
         return interaction.reply({ content: 'Song removed', ephemeral: true });
       }
 
       case 'show': {
         const name = interaction.options.getString('name', true);
-        const playlist = await prisma.playlist.findUnique({ where: { name } });
-        console.log(`playlist: ${JSON.stringify(playlist)}`);
+        const playlist = await playlists.fetchByName(name);
         if (!playlist) {
           return interaction.reply({
             content: `No playlist found with the name "${name}".`,
@@ -196,12 +177,11 @@ export default {
           });
         }
 
-        const songs = await prisma.song.findMany({ where: { playlistId: playlist.id } });
+        const playlistSongs = await songs.fetchAllForPlaylist(playlist.id);
         return interaction.reply({
           content: dedent`
           **Name:** ${playlist.name}
-          **Songs:**
-          ${songs.map((song) => `- https://www.youtube.com/watch?v=${song.youtubeVideoId}`).join('\n')}
+          **URL:** https://www.youtube.com/playlist?list=${playlist.youtubePlaylistId}
         `,
         });
       }

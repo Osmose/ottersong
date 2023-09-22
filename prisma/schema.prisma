@@ -8,11 +8,12 @@ datasource db {
 }
 
 model Playlist {
-  id                Int     @id @default(autoincrement())
-  type              String?
-  name              String  @unique
+  id                Int             @id @default(autoincrement())
+  name              String          @unique
   youtubePlaylistId String?
   songs             Song[]
+  watchedChannelId  Int?
+  WatchedChannel    WatchedChannel? @relation(fields: [watchedChannelId], references: [id])
 }
 
 model Song {
@@ -23,4 +24,12 @@ model Song {
   youtubeVideoId        String
 
   @@unique([playlistId, youtubeVideoId])
+}
+
+model WatchedChannel {
+  id        Int        @id @default(autoincrement())
+  name      String
+  channelId String     @unique
+  active    Boolean
+  playlists Playlist[]
 }

@@ -10,7 +10,7 @@ import logger from './logger';
 const CREDENTIALS_PATH = path.resolve(__dirname, '../youtube_token.json');
 const SCOPES = ['https://www.googleapis.com/auth/youtube'];
 
-export class Youtube {
+export class YoutubeApi {
   clientId: string;
   clientSecret: string;
   hasCredentials: boolean;
@@ -31,6 +31,11 @@ export class Youtube {
     } catch (err) {
       this.hasCredentials = false;
     }
+
+    // Store new tokens when we get them
+    this.oauth.on('tokens', async (tokens) => {
+      await Bun.write(CREDENTIALS_PATH, JSON.stringify(tokens));
+    });
   }
 
   async regenerateCredentials() {
@@ -102,4 +107,4 @@ export class Youtube {
   }
 }
 
-export default new Youtube(CONFIG.youtubeClientId, CONFIG.youtubeClientSecret);
+export default new YoutubeApi(CONFIG.youtubeClientId, CONFIG.youtubeClientSecret);

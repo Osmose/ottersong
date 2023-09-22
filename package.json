@@ -21,6 +21,9 @@
     "discord.js": "^14.13.0",
     "google-auth-library": "^9.0.0",
     "googleapis": "^126.0.1",
+    "js-video-url-parser": "^0.5.1",
+    "linkifyjs": "^4.1.1",
+    "tiny-typed-emitter": "^2.1.0",
     "winston": "^3.10.0"
   }
 }

@@ -4,11 +4,13 @@ import CONFIG from '../config.toml';
 import commands from './commands';
 import logger from './logger';
 import youtube from './youtube';
+import MessageListener from './modules/message_listener';
 
 // App initialization
 if (!youtube.hasCredentials) {
   await youtube.regenerateCredentials();
 }
+await MessageListener.init();
 
 // Update application commands
 const rest = new REST({ version: '10' }).setToken(CONFIG.token);
@@ -23,7 +25,9 @@ try {
 }
 
 // Set up bot client
-const client = new Client({ intents: [GatewayIntentBits.Guilds] });
+const client = new Client({
+  intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages, GatewayIntentBits.MessageContent],
+});
 client.on('ready', () => {
   logger.info(`Logged in as ${client.user?.tag}!`);
 });
@@ -46,6 +50,11 @@ client.on('interactionCreate', async (interaction) => {
       await command.autocomplete(interaction);
     }
   }
+});
+
+// Handle incoming message
+client.on('messageCreate', async (message) => {
+  await MessageListener.handleMessageCreate(message);
 });
 
 client.login(CONFIG.token);
