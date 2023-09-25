@@ -24,13 +24,15 @@ export class YoutubeApi {
     this.oauth = new google.auth.OAuth2(clientId, clientSecret, 'http://localhost');
     this.service = google.youtube('v3');
 
+    this.hasCredentials = false;
     try {
       const credentialsFile = fs.readFileSync(CREDENTIALS_PATH, { encoding: 'utf8' });
-      this.oauth.credentials = JSON.parse(credentialsFile);
-      this.hasCredentials = true;
-    } catch (err) {
-      this.hasCredentials = false;
-    }
+      const credentials = JSON.parse(credentialsFile);
+      if (credentials.access_token && credentials.refresh_token) {
+        this.oauth.credentials = credentials;
+        this.hasCredentials = true;
+      }
+    } catch (err) {}
 
     // Store new tokens when we get them
     this.oauth.on('tokens', async (tokens) => {
